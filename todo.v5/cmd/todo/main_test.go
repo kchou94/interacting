@@ -22,6 +22,10 @@ func TestMain(m *testing.M) {
 		binName += ".exe"
 	}
 
+	if os.Getenv("TODO_FILENAME") != "" {
+		fileName = os.Getenv("TODO_FILENAME")
+	}
+
 	build := exec.Command("go", "build", "-o", binName)
 
 	if err := build.Run(); err != nil {
@@ -89,6 +93,27 @@ func TestTodoCli(t *testing.T) {
 		}
 
 		expected := fmt.Sprintf("  1: %s\n", task2)
+		if expected != string(out) {
+			t.Errorf("Expected %q, got %q instead\n", expected, string(out))
+		}
+	})
+
+	t.Run("CompleteTasks", func(t *testing.T) {
+		cmd := exec.Command(cmdPath, "-complete", "1")
+
+		if err := cmd.Run(); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	t.Run("ListTasks", func(t *testing.T) {
+		cmd := exec.Command(cmdPath, "-hidecompleted")
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		expected := ""
 		if expected != string(out) {
 			t.Errorf("Expected %q, got %q instead\n", expected, string(out))
 		}

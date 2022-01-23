@@ -20,11 +20,14 @@ func main() {
 	list := flag.Bool("list", false, "List all tasks")
 	complete := flag.Int("complete", 0, "Item to be completed")
 	del := flag.Int("del", 0, "Delete task from Todo list")
+	inspect := flag.Bool("inspect", false, "Enable verbose output")
+	hideCompleted := flag.Bool("hidecompleted", false, "Hide completed tasks")
 
 	flag.Usage = func() {
 		fmt.Fprintf(flag.CommandLine.Output(),
 			"%s tool. Developed for The Pragmatic Bookshelf\n", os.Args[0])
 		fmt.Fprintf(flag.CommandLine.Output(), "Copyright 2020\n")
+		fmt.Fprintf(flag.CommandLine.Output(), "AddNewTaskFromArguments, AddNewTaskFromSTDIN\n")
 		fmt.Fprintln(flag.CommandLine.Output(), "Usage information:")
 		flag.PrintDefaults()
 	}
@@ -70,7 +73,9 @@ func main() {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
-		l.Add(t)
+		for _, task := range t {
+			l.Add(task)
+		}
 		if err := l.Save(todoFileName); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
@@ -86,6 +91,20 @@ func main() {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
+	case *inspect:
+		for _, t := range *l {
+			fmt.Printf("Task: %s\nDone: %t\nCreatedAt: %v\nCompletedAt: %v\n\n", t.Task, t.Done, t.CreatedAt, t.CompletedAt)
+		}
+	case *hideCompleted:
+		for k, t := range *l {
+			prefix := "  "
+			if t.Done {
+				continue
+			}
+
+			// Adjust the item number k to print numbers starting from 1 instead of 0
+			fmt.Printf("%s%d: %s\n", prefix, k+1, t.Task)
+		}
 	default:
 		// Invalid flag provided
 		fmt.Fprintln(os.Stderr, "Invalid option")
@@ -94,20 +113,30 @@ func main() {
 }
 
 // getTask function decides where to get the description for a new task from: arguments or STDIN
-func getTask(r io.Reader, args ...string) (string, error) {
+func getTask(r io.Reader, args ...string) ([]string, error) {
+	tasks := []string{}
+
 	if len(args) > 0 {
-		return strings.Join(args, " "), nil
+		tasks = append(tasks, strings.Join(args, " "))
+		return tasks, nil
 	}
 
 	s := bufio.NewScanner(r)
-	s.Scan()
-	if err := s.Err(); err != nil {
-		return "", err
+
+	// Use for loop to read multiple lines from STDIN
+	for s.Scan() {
+		if err := s.Err(); err != nil {
+			tasks = append(tasks, "")
+			return tasks, err
+		}
+
+		if len(s.Text()) == 0 {
+			tasks = append(tasks, "")
+			return tasks, fmt.Errorf("Task cannot be blank")
+		}
+
+		tasks = append(tasks, s.Text())
 	}
 
-	if len(s.Text()) == 0 {
-		return "", fmt.Errorf("Task cannot be blank")
-	}
-
-	return s.Text(), nil
+	return tasks, nil
 }
